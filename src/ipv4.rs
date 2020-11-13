@@ -30,7 +30,7 @@ impl fmt::Debug for Addr {
     }
 }
 
-t impl std::str::FromStr for Addr {
+impl std::str::FromStr for Addr {
     type Err = ParseAddrError;
 
     fn from_str(s: &str) -> Result<Self, ParseAddrError> {
