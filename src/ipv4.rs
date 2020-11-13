@@ -30,33 +30,7 @@ impl fmt::Debug for Addr {
     }
 }
 
-impl Addr {
-    // In order to accept both &str and String at the same time
-    // We make use of the AsRef trait
-    // Note this is a manuall implementation if
-    pub fn parse<S>(s: S) -> Result<Self, ParseAddrError>
-    where
-        S: AsRef<str>,
-    {
-        let mut tokens = s.as_ref().split(".");
-        let mut res = Self([0, 0, 0, 0]);
-
-        for part in res.0.iter_mut() {
-            *part = tokens
-                .next()
-                .ok_or(ParseAddrError::NotEnoughParts)?
-                .parse()?
-        }
-
-        if let Some(_) = tokens.next() {
-            return Err(ParseAddrError::TooManyParts);
-        }
-
-        Ok(res)
-    }
-}
-
-impl std::str::FromStr for Addr {
+t impl std::str::FromStr for Addr {
     type Err = ParseAddrError;
 
     fn from_str(s: &str) -> Result<Self, ParseAddrError> {
