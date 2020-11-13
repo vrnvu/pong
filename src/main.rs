@@ -1,3 +1,5 @@
+mod loadlibrary;
+
 use std::{ffi::c_void, fmt, mem::transmute, ptr::null};
 
 type HModule = *const c_void;
@@ -83,44 +85,42 @@ fn print_addr_as_integer() {
 }
 
 fn main() {
+    let iphlp = loadlibrary::Library::new("IPHLPAPI.dll").unwrap();
+    let IcmpCreateFile: IcmpCreateFile = iphlp.get_proc("IcmpCreateFile").unwrap();
+    let IcmpSendEcho: IcmpSendEcho = iphlp.get_proc("IcmpSendEcho").unwrap();
+
+    let handle = IcmpCreateFile();
+    let data = "tu me dejaste de querer";
+
+    let ip_opts = IpOptionInformation {
+        ttl: 128,
+        tos: 0,
+        flags: 0,
+        options_data: 0,
+        options_size: 0,
+    };
+
+    use std::mem;
+    let reply_size = mem::size_of::<IcmpEchoReply>();
+
+    let reply_buf_size = reply_size + 8 + data.len();
+    let mut reply_buf = vec![0u8; reply_buf_size];
+
+    let ret = IcmpSendEcho(
+        handle,
+        IPAddr([8, 8, 8, 8]),
+        data.as_ptr(),
+        data.len() as u16,
+        Some(&ip_opts),
+        reply_buf.as_mut_ptr(),
+        reply_buf_size as u32,
+        4000,
+    );
+    if ret == 0 {
+        panic!("IcmpSendEcho failed! ret = {}", ret);
+    }
+
     unsafe {
-        let h = LoadLibraryA("IPHLPAPI.dll\0".as_ptr());
-        let IcmpCreateFile: IcmpCreateFile =
-            transmute(GetProcAddress(h, "IcmpCreateFile\0".as_ptr()));
-        let IcmpSendEcho: IcmpSendEcho = transmute(GetProcAddress(h, "IcmpSendEcho\0".as_ptr()));
-        let handle = IcmpCreateFile();
-        println!("{:?}", handle);
-
-        let data = "tu me dejaste de querer";
-
-        let ip_opts = IpOptionInformation {
-            ttl: 128,
-            tos: 0,
-            flags: 0,
-            options_data: 0,
-            options_size: 0,
-        };
-
-        use std::mem;
-        let reply_size = mem::size_of::<IcmpEchoReply>();
-
-        let reply_buf_size = reply_size + 8 + data.len();
-        let mut reply_buf = vec![0u8; reply_buf_size];
-
-        let ret = IcmpSendEcho(
-            handle,
-            IPAddr([8, 8, 8, 8]),
-            data.as_ptr(),
-            data.len() as u16,
-            Some(&ip_opts),
-            reply_buf.as_mut_ptr(),
-            reply_buf_size as u32,
-            4000,
-        );
-        if ret == 0 {
-            panic!("IcmpSendEcho failed! ret = {}", ret);
-        }
-
         // casting between pointer types requires transmute:
         let reply: &IcmpEchoReply = mem::transmute(&reply_buf[0]);
         println!("{:#?}", *reply);
