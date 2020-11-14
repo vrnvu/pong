@@ -1,7 +1,19 @@
 mod icmp_sys;
 use crate::ipv4;
 
-use std::mem::size_of;
+use std::{
+    mem::{size_of, transmute},
+    slice,
+    time::Duration,
+};
+
+// ICMP Reply
+pub struct Reply {
+    pub addr: ipv4::Addr,
+    pub data: Vec<u8>,
+    pub rtt: Duration,
+    pub ttl: u8,
+}
 
 // ICMP Request
 pub struct Request {
@@ -43,8 +55,8 @@ impl Request {
         self
     }
 
-    pub fn send(self) -> Result<(), String> {
-        let handle = icmp_sys::IcmpCreateFile();
+    pub fn send(self) -> Result<Reply, String> {
+        let handle = icmp_sys::icmp_create_file();
 
         let data = self.data.unwrap_or_default();
 
@@ -60,7 +72,7 @@ impl Request {
             options_size: 0,
         };
 
-        let ret = icmp_sys::IcmpSendEcho(
+        let ret = icmp_sys::icmp_send_echo(
             handle,
             self.dest,
             data.as_ptr(),
@@ -72,13 +84,24 @@ impl Request {
         );
 
         // new:
-        icmp_sys::IcmpCloseHandle(handle);
+        icmp_sys::icmp_close_handle(handle);
 
         match ret {
             0 => Err("IcmpSendEcho failed :(".to_string()),
-            _ => Ok(()),
+            _ => {
+                let reply: &icmp_sys::IcmpEchoReply = unsafe { transmute(&reply_buf[0]) };
+                let data: Vec<u8> = unsafe {
+                    let data_ptr: *const u8 = transmute(&reply_buf[reply_size + 8]);
+                    slice::from_raw_parts(data_ptr, reply.data_size as usize)
+                }
+                .into();
+                Ok(Reply {
+                    addr: reply.address,
+                    data,
+                    rtt: Duration::from_millis(reply.rtt as u64),
+                    ttl: reply.options.ttl,
+                })
+            }
         }
     }
 }
-
-pub struct Reply {}

@@ -1,6 +1,5 @@
 use crate::ipv4;
 
-use crate::loadlibrary::Library;
 use once_cell::sync::Lazy;
 use std::ffi::c_void;
 
@@ -12,6 +11,7 @@ pub static FUNCTIONS: Lazy<Functions> = Lazy::new(|| {
         IcmpCloseHandle: lib.get_proc("IcmpCloseHandle").unwrap(),
     }
 });
+
 pub type Handle = *const c_void;
 
 #[repr(C)]
@@ -24,6 +24,9 @@ pub struct IpOptionInformation {
     pub options_data: u32,
 }
 
+// We should not exposet his IcmpEchoReply directly for two reasons
+// We want to keep it private at icmp_sys mod level
+// Data is a row pointer
 #[repr(C)]
 #[derive(Debug)]
 pub struct IcmpEchoReply {
@@ -35,17 +38,6 @@ pub struct IcmpEchoReply {
     pub data: *const u8,
     pub options: IpOptionInformation,
 }
-
-type IcmpSendEcho = extern "stdcall" fn(
-    handle: Handle,
-    dest: ipv4::Addr,
-    request_data: *const u8,
-    request_size: u16,
-    request_options: Option<&IpOptionInformation>,
-    reply_buffer: *mut u8,
-    reply_size: u32,
-    timeout: u32,
-) -> u32;
 
 pub struct Functions {
     pub IcmpCreateFile: extern "stdcall" fn() -> Handle,
@@ -62,25 +54,15 @@ pub struct Functions {
     pub IcmpCloseHandle: extern "stdcall" fn(handle: Handle),
 }
 
-impl Functions {
-    fn get() -> Self {
-        let iphlp = Library::new("IPHLPAPI.dll").unwrap();
-        Self {
-            IcmpCreateFile: iphlp.get_proc("IcmpCreateFile").unwrap(),
-            IcmpSendEcho: iphlp.get_proc("IcmpSendEcho").unwrap(),
-            IcmpCloseHandle: iphlp.get_proc("IcmpCloseHandle").unwrap(),
-        }
-    }
-}
 // Temporary implementation see the memory leak
 // as the resource never gets closed
 #[inline(always)]
-pub fn IcmpCreateFile() -> Handle {
+pub fn icmp_create_file() -> Handle {
     (FUNCTIONS.IcmpCreateFile)()
 }
 
 // Leak again
-pub fn IcmpSendEcho(
+pub fn icmp_send_echo(
     handle: Handle,
     dest: ipv4::Addr,
     request_data: *const u8,
@@ -102,6 +84,6 @@ pub fn IcmpSendEcho(
     )
 }
 
-pub fn IcmpCloseHandle(handle: Handle) {
+pub fn icmp_close_handle(handle: Handle) {
     (FUNCTIONS.IcmpCloseHandle)(handle)
 }

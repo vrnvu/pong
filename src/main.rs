@@ -6,7 +6,7 @@ use std::{env, error::Error, process::exit};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arg = env::args().nth(1).unwrap_or_else(|| {
-        println!("Usage: sup DEST");
+        println!("Usage: pong DEST");
         exit(1);
     });
 
@@ -21,7 +21,13 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     for _ in 0..4 {
         match Request::new(dest).ttl(128).timeout(4000).data(data).send() {
-            Ok(_) => println!("Reply from {:?}: bytes={} time=? TTL=?", dest, data.len()),
+            Ok(res) => println!(
+                "Reply from {:?}: bytes={} time={:?} TTL={}",
+                res.addr,
+                res.data.len(),
+                res.rtt,
+                res.ttl,
+            ),
             Err(_) => println!("Something went wrong"),
         }
 
