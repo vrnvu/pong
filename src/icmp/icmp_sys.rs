@@ -3,6 +3,8 @@ use crate::ipv4;
 use once_cell::sync::Lazy;
 use std::ffi::c_void;
 
+// We use lazy_static and o nce-cell to have lazily-initialized statics
+// This allows us to manage several external functions from the same DLL
 pub static FUNCTIONS: Lazy<Functions> = Lazy::new(|| {
     let lib = crate::loadlibrary::Library::new("IPHLPAPI.dll").unwrap();
     Functions {
