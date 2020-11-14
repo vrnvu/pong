@@ -21,6 +21,7 @@ impl From<ParseIntError> for ParseAddrError {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Addr(pub [u8; 4]);
 
 impl fmt::Debug for Addr {

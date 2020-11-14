@@ -1,11 +1,14 @@
 use crate::ipv4;
 
 use crate::loadlibrary::Library;
+use once_cell::sync::Lazy;
 use std::ffi::c_void;
 
+pub static FUNCTIONS: Lazy<Functions> = Lazy::new(|| Functions::get());
 pub type Handle = *const c_void;
 
 type IcmpCreateFile = extern "stdcall" fn() -> Handle;
+type IcmpCloseHandle = extern "stdcall" fn(handle: Handle);
 
 #[repr(C)]
 #[derive(Debug)]
@@ -29,14 +32,6 @@ pub struct IcmpEchoReply {
     pub options: IpOptionInformation,
 }
 
-// Temporary implementation see the memory leak
-// as the resource never gets closed
-pub fn IcmpCreateFile() -> Handle {
-    let iphlp = Library::new("IPHLPAPI.dll").unwrap();
-    let IcmpCreateFile: IcmpCreateFile = iphlp.get_proc("IcmpCreateFile").unwrap();
-    IcmpCreateFile()
-}
-
 type IcmpSendEcho = extern "stdcall" fn(
     handle: Handle,
     dest: ipv4::Addr,
@@ -47,6 +42,39 @@ type IcmpSendEcho = extern "stdcall" fn(
     reply_size: u32,
     timeout: u32,
 ) -> u32;
+
+pub struct Functions {
+    pub IcmpCreateFile: extern "stdcall" fn() -> Handle,
+    pub IcmpSendEcho: extern "stdcall" fn(
+        handle: Handle,
+        dest: ipv4::Addr,
+        request_data: *const u8,
+        request_size: u16,
+        request_options: Option<&IpOptionInformation>,
+        reply_buffer: *mut u8,
+        reply_size: u32,
+        timeout: u32,
+    ) -> u32,
+    pub IcmpCloseHandle: extern "stdcall" fn(handle: Handle),
+}
+
+impl Functions {
+    fn get() -> Self {
+        let iphlp = Library::new("IPHLPAPI.dll").unwrap();
+        Self {
+            IcmpCreateFile: iphlp.get_proc("IcmpCreateFile").unwrap(),
+            IcmpSendEcho: iphlp.get_proc("IcmpSendEcho").unwrap(),
+            IcmpCloseHandle: iphlp.get_proc("IcmpCloseHandle").unwrap(),
+        }
+    }
+}
+// Temporary implementation see the memory leak
+// as the resource never gets closed
+pub fn IcmpCreateFile() -> Handle {
+    let iphlp = Library::new("IPHLPAPI.dll").unwrap();
+    let IcmpCreateFile: IcmpCreateFile = iphlp.get_proc("IcmpCreateFile").unwrap();
+    IcmpCreateFile()
+}
 
 // Leak again
 pub fn IcmpSendEcho(
@@ -71,4 +99,10 @@ pub fn IcmpSendEcho(
         reply_size,
         timeout,
     )
+}
+
+pub fn IcmpCloseHandle(handle: Handle) {
+    let iphlp = Library::new("IPHLPAPI.dll").unwrap();
+    let IcmpCloseHandle: IcmpCloseHandle = iphlp.get_proc("IcmpCloseHandle").unwrap();
+    IcmpCloseHandle(handle)
 }

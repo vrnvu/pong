@@ -9,7 +9,25 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Usage: sup DEST");
         exit(1);
     });
-    icmp::ping(arg.parse()?)?;
+
+    use icmp::Request;
+    let dest = arg.parse()?;
+    let data = "Tu me dejaste de querer";
+
+    println!();
+    println!("Pinging {:?} with {} bytes of data:", dest, data.len());
+
+    use std::{thread::sleep, time::Duration};
+
+    for _ in 0..4 {
+        match Request::new(dest).ttl(128).timeout(4000).data(data).send() {
+            Ok(_) => println!("Reply from {:?}: bytes={} time=? TTL=?", dest, data.len()),
+            Err(_) => println!("Something went wrong"),
+        }
+
+        sleep(Duration::from_secs(1));
+    }
+    println!();
 
     Ok(())
 }
