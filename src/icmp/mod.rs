@@ -44,9 +44,7 @@ impl Request {
     }
 
     pub fn send(self) -> Result<(), String> {
-        let fns = &icmp_sys::FUNCTIONS;
-
-        let handle = (fns.IcmpCreateFile)();
+        let handle = icmp_sys::IcmpCreateFile();
 
         let data = self.data.unwrap_or_default();
 
@@ -62,7 +60,7 @@ impl Request {
             options_size: 0,
         };
 
-        let ret = (fns.IcmpSendEcho)(
+        let ret = icmp_sys::IcmpSendEcho(
             handle,
             self.dest,
             data.as_ptr(),
@@ -74,7 +72,7 @@ impl Request {
         );
 
         // new:
-        (fns.IcmpCloseHandle)(handle);
+        icmp_sys::IcmpCloseHandle(handle);
 
         match ret {
             0 => Err("IcmpSendEcho failed :(".to_string()),

@@ -4,11 +4,15 @@ use crate::loadlibrary::Library;
 use once_cell::sync::Lazy;
 use std::ffi::c_void;
 
-pub static FUNCTIONS: Lazy<Functions> = Lazy::new(|| Functions::get());
+pub static FUNCTIONS: Lazy<Functions> = Lazy::new(|| {
+    let lib = crate::loadlibrary::Library::new("IPHLPAPI.dll").unwrap();
+    Functions {
+        IcmpCreateFile: lib.get_proc("IcmpCreateFile").unwrap(),
+        IcmpSendEcho: lib.get_proc("IcmpSendEcho").unwrap(),
+        IcmpCloseHandle: lib.get_proc("IcmpCloseHandle").unwrap(),
+    }
+});
 pub type Handle = *const c_void;
-
-type IcmpCreateFile = extern "stdcall" fn() -> Handle;
-type IcmpCloseHandle = extern "stdcall" fn(handle: Handle);
 
 #[repr(C)]
 #[derive(Debug)]
@@ -70,10 +74,9 @@ impl Functions {
 }
 // Temporary implementation see the memory leak
 // as the resource never gets closed
+#[inline(always)]
 pub fn IcmpCreateFile() -> Handle {
-    let iphlp = Library::new("IPHLPAPI.dll").unwrap();
-    let IcmpCreateFile: IcmpCreateFile = iphlp.get_proc("IcmpCreateFile").unwrap();
-    IcmpCreateFile()
+    (FUNCTIONS.IcmpCreateFile)()
 }
 
 // Leak again
@@ -87,9 +90,7 @@ pub fn IcmpSendEcho(
     reply_size: u32,
     timeout: u32,
 ) -> u32 {
-    let iphlp = Library::new("IPHLPAPI.dll").unwrap();
-    let IcmpSendEcho: IcmpSendEcho = iphlp.get_proc("IcmpSendEcho").unwrap();
-    IcmpSendEcho(
+    (FUNCTIONS.IcmpSendEcho)(
         handle,
         dest,
         request_data,
@@ -102,7 +103,5 @@ pub fn IcmpSendEcho(
 }
 
 pub fn IcmpCloseHandle(handle: Handle) {
-    let iphlp = Library::new("IPHLPAPI.dll").unwrap();
-    let IcmpCloseHandle: IcmpCloseHandle = iphlp.get_proc("IcmpCloseHandle").unwrap();
-    IcmpCloseHandle(handle)
+    (FUNCTIONS.IcmpCloseHandle)(handle)
 }
